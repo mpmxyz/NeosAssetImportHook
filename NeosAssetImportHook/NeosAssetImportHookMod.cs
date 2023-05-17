@@ -156,7 +156,7 @@ namespace NeosAssetImportHook
         }
 
         private static void NotifyAllAssetProviders(Slot root, Slot assetsSlot = null)
-        { 
+        {
             var assetProviders = new List<IAssetProvider>();
 
             if (assetsSlot != root)

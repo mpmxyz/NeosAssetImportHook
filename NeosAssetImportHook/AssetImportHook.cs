@@ -5,7 +5,7 @@ using System.Collections.Generic;
 namespace NeosAssetImportHook
 {
     public delegate void PostImportEvent(Slot slot, List<IAssetProvider> assetProviders);
-    
+
     public static class AssetImportHooks
     {
         public static event PostImportEvent PostImport = null;
