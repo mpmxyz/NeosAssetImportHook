@@ -1,0 +1,132 @@
+name: Build/Release
+on: [push, pull_request]
+
+permissions:
+  contents: write
+
+env:
+  NeosPath: "${{ github.workspace }}/neos_install/" #see neos-modding-group/neos-plugin-setup-action
+  BUILD_TYPE: "CICD"
+  PUBLISH_ARTIFACTS: ${{ startsWith(github.ref, 'refs/tags/') || contains(github.ref, 'publish-test') }}
+  UPLOAD_ARTIFACTS: ${{ startsWith(github.ref, 'refs/tags/') || contains(github.ref, 'publish-test') || github.ref == 'refs/heads/main' || contains(github.ref, 'upload-test') }} # only publish workflow artifacts for pushes to main or tags
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@v3
+      - name: Setup build environment
+        uses: neos-modding-group/neos-plugin-setup-action@master
+        #TODO: check for possible caching of neos build env
+      - name: Download NeosModLoader and Harmony
+        run: |
+          mkdir -p "${NeosPath}/nml_libs" "${NeosPath}/Libraries"
+          cd "${NeosPath}/nml_libs" && wget "https://github.com/neos-modding-group/NeosModLoader/releases/latest/download/0Harmony.dll"
+          cd "${NeosPath}/Libraries" && wget "https://github.com/neos-modding-group/NeosModLoader/releases/latest/download/NeosModLoader.dll"
+      - name: Lint
+        run: dotnet format --verbosity detailed --verify-no-changes ./NeosDocumentImport.sln
+      - name: Build binaries, create release directory structure
+        run: |
+          dotnet build ./NeosDocumentImport.sln --configuration Release
+
+          mkdir ./release
+          mkdir ./release/nml_mods
+          mkdir ./release/nml_libs
+          
+          mv ./NeosDocumentImport/bin/Release/net462/win-x64/NeosDocumentImport.dll ./release/nml_mods/NeosDocumentImport.dll
+          
+          mv ./NeosDocumentImport_PDFConverter/bin/Release/net462/win-x64/NeosDocumentImport_PDFConverter.dll ./release/nml_mods/NeosDocumentImport_PDFConverter.dll
+          mv ./NeosDocumentImport_PDFConverter/bin/Release/net462/win-x64/pdfium.dll ./release/pdfium.dll
+          mv ./NeosDocumentImport_PDFConverter/bin/Release/net462/win-x64/Docnet.Core.dll ./release/nml_libs/Docnet.Core.dll
+          
+          mv ./NeosDocumentImport_SVGConverter/bin/Release/net462/win-x64/NeosDocumentImport_SVGConverter.dll ./release/nml_mods/NeosDocumentImport_SVGConverter.dll
+          mv ./NeosDocumentImport_SVGConverter/bin/Release/net462/win-x64/ExCSS.dll ./release/nml_libs/ExCSS.dll
+          mv ./NeosDocumentImport_SVGConverter/bin/Release/net462/win-x64/Fizzler.dll ./release/nml_libs/Fizzler.dll
+          mv ./NeosDocumentImport_SVGConverter/bin/Release/net462/win-x64/Svg.dll ./release/nml_libs/Svg.dll
+
+      - name: Archive Release
+        uses: thedoctor0/zip-release@0.7.0
+        with:
+          type: 'zip'
+          filename: 'NeosDocumentImport.zip'
+          path: '.'
+          directory: './release'
+      - name: Calculate SHA256
+        run: sha256sum ./release/*.dll ./release/*/*.dll ./release/*.zip
+          
+      - name: Upload artifacts (zip)
+        if: ${{ env.UPLOAD_ARTIFACTS == 'true' }}
+        uses: actions/upload-artifact@v3
+        with:
+          name: NeosDocumentImport
+          path: ./release/NeosDocumentImport.zip
+
+      - name: Upload artifacts (nml_mods/NeosDocumentImport.dll)
+        if: ${{ env.UPLOAD_ARTIFACTS == 'true' }}
+        uses: actions/upload-artifact@v3
+        with:
+          name: NeosDocumentImport.dll
+          path: ./release/nml_mods/NeosDocumentImport.dll
+          if-no-files-found: error
+          
+      - name: Upload artifacts (nml_mods/NeosDocumentImport_PDFConverter.dll)
+        if: ${{ env.UPLOAD_ARTIFACTS == 'true' }}
+        uses: actions/upload-artifact@v3
+        with:
+          name: NeosDocumentImport_PDFConverter.dll
+          path: ./release/nml_mods/NeosDocumentImport_PDFConverter.dll
+          if-no-files-found: error
+      - name: Upload artifacts (pdfium.dll)
+        if: ${{ env.UPLOAD_ARTIFACTS == 'true' }}
+        uses: actions/upload-artifact@v3
+        with:
+          name: pdfium.dll
+          path: ./release/pdfium.dll
+          if-no-files-found: error
+      - name: Upload artifacts (nml_libs/Docnet.Core.dll)
+        if: ${{ env.UPLOAD_ARTIFACTS == 'true' }}
+        uses: actions/upload-artifact@v3
+        with:
+          name: Docnet.Core.dll
+          path: ./release/nml_libs/Docnet.Core.dll
+          if-no-files-found: error
+          
+      - name: Upload artifacts (nml_mods/NeosDocumentImport_SVGConverter.dll)
+        if: ${{ env.UPLOAD_ARTIFACTS == 'true' }}
+        uses: actions/upload-artifact@v3
+        with:
+          name: NeosDocumentImport_SVGConverter.dll
+          path: ./release/nml_mods/NeosDocumentImport_SVGConverter.dll
+          if-no-files-found: error
+      - name: Upload artifacts (nml_libs/ExCSS.dll)
+        if: ${{ env.UPLOAD_ARTIFACTS == 'true' }}
+        uses: actions/upload-artifact@v3
+        with:
+          name: ExCSS.dll
+          path: ./release/nml_libs/ExCSS.dll
+          if-no-files-found: error
+      - name: Upload artifacts (nml_libs/Fizzler.dll)
+        if: ${{ env.UPLOAD_ARTIFACTS == 'true' }}
+        uses: actions/upload-artifact@v3
+        with:
+          name: Fizzler.dll
+          path: ./release/nml_libs/Fizzler.dll
+          if-no-files-found: error
+      - name: Upload artifacts (nml_libs/Svg.dll)
+        if: ${{ env.UPLOAD_ARTIFACTS == 'true' }}
+        uses: actions/upload-artifact@v3
+        with:
+          name: Svg.dll
+          path: ./release/nml_libs/Svg.dll
+          if-no-files-found: error
+          
+      - name: Create release draft
+        if: ${{ env.PUBLISH_ARTIFACTS == 'true' }}
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            ./release/*.zip
+            ./release/*.dll
+            ./release/*/*.dll
+          draft: true
