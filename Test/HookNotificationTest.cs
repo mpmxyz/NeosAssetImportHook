@@ -65,7 +65,6 @@ namespace NeosAssetImportHook
             {
                 AssetImportHooks.PostImport -= handler;
             }
-            
         }
 
         [Fact]
