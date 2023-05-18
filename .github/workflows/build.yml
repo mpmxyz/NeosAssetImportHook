@@ -35,7 +35,9 @@ jobs:
           mv ./NeosAssetImportHook/bin/Release/net462/win-x64/NeosAssetImportHook.dll ./release/NeosAssetImportHook.dll
 
       - name: Run tests
-        run: dotnet test ./NeosAssetImportHook.sln
+        run: |
+          dotnet build ./NeosAssetImportHook.sln --configuration Debug
+          dotnet test ./NeosAssetImportHook.sln --configuration Debug
 
       - name: Calculate SHA256
         run: sha256sum ./release/*.dll
