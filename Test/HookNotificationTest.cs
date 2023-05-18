@@ -1,29 +1,18 @@
 using FrooxEngine;
-using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Reflection;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace NeosAssetImportHook
 {
     public partial class HookNotificationTest
     {
-        ITestOutputHelper output;
-        public HookNotificationTest(ITestOutputHelper output)
-        {
-            this.output = output;
-        }
-
         [Fact]
         public void UntypedHooksAreNotified()
         {
             var called = false;
-            output.WriteLine("Before adding delegate");
             UntypedPostImportHandler handler = (slot, type, assets) =>
             {
-                output.WriteLine("Within delegate call");
                 var elems = new List<IAssetProvider>(assets);
                 Assert.Null(slot);
                 Assert.Equal(typeof(Mesh), type);
@@ -38,11 +27,9 @@ namespace NeosAssetImportHook
             try
             {
                 AssetImportHooks.PostImport += handler;
-                output.WriteLine("Before getting generic method");
                 var notify = typeof(AssetImportHooks)
                     .GetMethod("NotifyPostImport", BindingFlags.NonPublic | BindingFlags.Static)
                     .MakeGenericMethod(typeof(Mesh));
-                output.WriteLine("Before invoking generic method");
 
                 notify.Invoke(
                     null,
@@ -57,7 +44,6 @@ namespace NeosAssetImportHook
                     }
                     }
                 );
-                output.WriteLine("After invoking generic method");
 
                 Assert.True(called);
             }
