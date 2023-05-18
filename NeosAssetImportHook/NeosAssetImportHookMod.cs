@@ -24,11 +24,6 @@ namespace NeosAssetImportHook
         {
             Harmony harmony = new Harmony("com.github.mpmxyz.assetimporthook");
             harmony.PatchAll();
-            AssetImportHooks.PostImport += (a, b, c) => UniLog.Log($"Untyped: {a.Name} {b} {c.Count()}");
-            AssetImportHooks.PostImport += AssetImportHooks.Typed<Mesh>((a, b, c) =>
-            {
-                UniLog.Log($"Typed: {a.Name} {b.Count()} {c.Count()}");
-            });
         }
 
         /*
