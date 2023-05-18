@@ -9,6 +9,9 @@
 	<Reference Include="FrooxEngine">
 	  <HintPath>$(NeosPath)\Neos_Data\Managed\FrooxEngine.dll</HintPath>
     </Reference>
+    <Reference Include="BaseX">
+	  <HintPath>$(NeosPath)\Neos_Data\Managed\BaseX.dll</HintPath>
+	</Reference>
 	<PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.6.0" />
 	<PackageReference Include="Microsoft.TestPlatform.ObjectModel" Version="17.6.0" />
     <PackageReference Include="xunit" Version="2.4.2" />

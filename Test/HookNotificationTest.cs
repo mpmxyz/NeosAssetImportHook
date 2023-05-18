@@ -1,54 +1,78 @@
 using FrooxEngine;
+using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Reflection;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace NeosAssetImportHook
 {
-    public class HookNotificationTest
+    public partial class HookNotificationTest
     {
+        ITestOutputHelper output;
+        public HookNotificationTest(ITestOutputHelper output)
+        {
+            this.output = output;
+        }
+
         [Fact]
         public void UntypedHooksAreNotified()
         {
             var called = false;
-            AssetImportHooks.PostImport += (slot, type, assets) =>
+            output.WriteLine("Before adding delegate");
+            UntypedPostImportHandler handler = (slot, type, assets) =>
             {
+                output.WriteLine("Within delegate call");
                 var elems = new List<IAssetProvider>(assets);
                 Assert.Null(slot);
                 Assert.Equal(typeof(Mesh), type);
 
                 Assert.Equal(3, elems.Count);
-                Assert.IsType<FakeMeshAsset>(elems[0]);
-                Assert.IsType<FakeMeshAsset>(elems[1]);
-                Assert.IsType<FakeTextureAsset>(elems[2]);
+                Assert.IsType<FakeMeshAssetProvider>(elems[0]);
+                Assert.IsType<FakeMeshAssetProvider>(elems[1]);
+                Assert.IsType<FakeTextureAssetProvider>(elems[2]);
                 called = true;
             };
-            var notify = typeof(AssetImportHooks)
-                .GetMethod("NotifyPostImport", BindingFlags.NonPublic | BindingFlags.Static)
-                .MakeGenericMethod(typeof(Mesh));
 
-            notify.Invoke(
-                null,
-                new object[]
-                {
+            try
+            {
+                AssetImportHooks.PostImport += handler;
+                output.WriteLine("Before getting generic method");
+                var notify = typeof(AssetImportHooks)
+                    .GetMethod("NotifyPostImport", BindingFlags.NonPublic | BindingFlags.Static)
+                    .MakeGenericMethod(typeof(Mesh));
+                output.WriteLine("Before invoking generic method");
+
+                notify.Invoke(
+                    null,
+                    new object[]
+                    {
                     null,
                     new List<IAssetProvider>()
                     {
-                        new FakeMeshAsset(),
-                        new FakeMeshAsset(),
-                        new FakeTextureAsset(),
+                        new FakeMeshAssetProvider(),
+                        new FakeMeshAssetProvider(),
+                        new FakeTextureAssetProvider(),
                     }
-                }
-            );
+                    }
+                );
+                output.WriteLine("After invoking generic method");
 
-            Assert.True(called);
+                Assert.True(called);
+            }
+            finally
+            {
+                AssetImportHooks.PostImport -= handler;
+            }
         }
 
         [Fact]
         public void MatchingTypedHooksAreNotified()
         {
             var called = false;
-            AssetImportHooks.PostImport += AssetImportHooks.Typed<Mesh>((slot, primary, secondary) =>
+
+            UntypedPostImportHandler handler = AssetImportHooks.Typed<Mesh>((slot, primary, secondary) =>
             {
                 var prim = new List<IAssetProvider>(primary);
                 var scnd = new List<IAssetProvider>(secondary);
@@ -56,94 +80,79 @@ namespace NeosAssetImportHook
                 Assert.Null(slot);
 
                 Assert.Equal(2, prim.Count);
-                Assert.IsType<FakeMeshAsset>(prim[0]);
-                Assert.IsType<FakeMeshAsset>(prim[1]);
+                Assert.IsType<FakeMeshAssetProvider>(prim[0]);
+                Assert.IsType<FakeMeshAssetProvider>(prim[1]);
 
                 Assert.Single(scnd);
-                Assert.IsType<FakeTextureAsset>(scnd[0]);
+                Assert.IsType<FakeTextureAssetProvider>(scnd[0]);
                 called = true;
             });
-            var notify = typeof(AssetImportHooks)
-                .GetMethod("NotifyPostImport", BindingFlags.NonPublic | BindingFlags.Static)
-                .MakeGenericMethod(typeof(Mesh));
 
-            notify.Invoke(
-                null,
-                new object[]
-                {
+            try
+            {
+                AssetImportHooks.PostImport += handler;
+                var notify = typeof(AssetImportHooks)
+                    .GetMethod("NotifyPostImport", BindingFlags.NonPublic | BindingFlags.Static)
+                    .MakeGenericMethod(typeof(Mesh));
+
+                notify.Invoke(
+                    null,
+                    new object[]
+                    {
                     null,
                     new List<IAssetProvider>()
                     {
-                        new FakeMeshAsset(),
-                        new FakeMeshAsset(),
-                        new FakeTextureAsset(),
+                        new FakeMeshAssetProvider(),
+                        new FakeMeshAssetProvider(),
+                        new FakeTextureAssetProvider(),
                     }
-                }
-            );
+                    }
+                );
 
-            Assert.True(called);
+                Assert.True(called);
+            }
+            finally
+            {
+                AssetImportHooks.PostImport -= handler;
+            }
         }
 
         [Fact]
         public void UnmatchingTypedHooksAreIgnored()
         {
             var called = false;
-            AssetImportHooks.PostImport += AssetImportHooks.Typed<Mesh>((slot, primary, secondary) =>
+
+            UntypedPostImportHandler handler = AssetImportHooks.Typed<Mesh>((slot, primary, secondary) =>
             {
                 called = true;
             });
-            var notify = typeof(AssetImportHooks)
-                .GetMethod("NotifyPostImport", BindingFlags.NonPublic | BindingFlags.Static)
-                .MakeGenericMethod(typeof(Texture2D));
 
-            notify.Invoke(
-                null,
-                new object[]
-                {
+            try
+            {
+                AssetImportHooks.PostImport += handler;
+                var notify = typeof(AssetImportHooks)
+                    .GetMethod("NotifyPostImport", BindingFlags.NonPublic | BindingFlags.Static)
+                    .MakeGenericMethod(typeof(Texture2D));
+
+                notify.Invoke(
+                    null,
+                    new object[]
+                    {
                     null,
                     new List<IAssetProvider>()
                     {
-                        new FakeMeshAsset(),
-                        new FakeMeshAsset(),
-                        new FakeTextureAsset(),
+                        new FakeMeshAssetProvider(),
+                        new FakeMeshAssetProvider(),
+                        new FakeTextureAssetProvider(),
                     }
-                }
-            );
+                    }
+                );
 
-            Assert.False(called);
-        }
-
-        private class FakeMeshAsset : AssetProvider<Mesh>
-        {
-            public override Mesh Asset => throw new System.NotImplementedException();
-
-            public override bool IsAssetAvailable => throw new System.NotImplementedException();
-
-            protected override void FreeAsset()
-            {
-                throw new System.NotImplementedException();
+                Assert.False(called);
             }
-
-            protected override void UpdateAsset()
+            finally
             {
-                throw new System.NotImplementedException();
-            }
-        }
-
-        private class FakeTextureAsset : AssetProvider<Texture2D>
-        {
-            public override Texture2D Asset => throw new System.NotImplementedException();
-
-            public override bool IsAssetAvailable => throw new System.NotImplementedException();
-
-            protected override void FreeAsset()
-            {
-                throw new System.NotImplementedException();
-            }
-
-            protected override void UpdateAsset()
-            {
-                throw new System.NotImplementedException();
+                AssetImportHooks.PostImport -= handler;
             }
         }
     }
