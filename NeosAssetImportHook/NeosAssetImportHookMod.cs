@@ -1,5 +1,4 @@
 ﻿using BaseX;
-using CodeX;
 using FrooxEngine;
 using HarmonyLib;
 using NeosModLoader;
@@ -11,6 +10,10 @@ using System.Threading.Tasks;
 
 namespace NeosAssetImportHook
 {
+    /// <summary>
+    /// This file is just digging itself into Neos to intercept as many asset imports as possible. <br/>
+    /// If you are using this mod you should be looking for <see cref="AssetImportHooks"/>.
+    /// </summary>
     public class NeosAssetImportHookMod : NeosMod
     {
         public override string Name => "NeosAssetImportHook";
@@ -21,6 +24,11 @@ namespace NeosAssetImportHook
         {
             Harmony harmony = new Harmony("com.github.mpmxyz.assetimporthook");
             harmony.PatchAll();
+            AssetImportHooks.PostImport += (a, b, c) => UniLog.Log($"Untyped: {a.Name} {b} {c.Count()}");
+            AssetImportHooks.PostImport += AssetImportHooks.Typed<Mesh>((a, b, c) =>
+            {
+                UniLog.Log($"Typed: {a.Name} {b.Count()} {c.Count()}");
+            });
         }
 
         /*
@@ -68,6 +76,10 @@ namespace NeosAssetImportHook
          * AssetClass.Special (logixstring)
          *  no coverage
          */
+        /// <summary>
+        /// Attention: lots of patches incoming!
+        /// (The previous multiline comment should give you more info about what.)
+        /// </summary>
         [HarmonyPatch]
         static class Patches
         {
@@ -75,14 +87,14 @@ namespace NeosAssetImportHook
             [HarmonyPostfix]
             public static void PostfixRawFile(ref Task __result, Slot root, string file)
             {
-                __result = AwaitAndNotify(__result, root);
+                __result = AwaitAndNotify<Binary>(__result, root);
             }
 
             [HarmonyPatch(typeof(ImageImporter), "ImportImage")]
             [HarmonyPostfix]
             public static void PostfixImage(ref Task __result, string path, Slot targetSlot, bool addCollider = true, ImageProjection projection = ImageProjection.Perspective, StereoLayout stereoLayout = StereoLayout.None, float3? forward = null, TextureConversion convert = TextureConversion.Auto, bool setupScreenshotMetadata = false)
             {
-                __result = AwaitAndNotify(__result, targetSlot);
+                __result = AwaitAndNotify<Texture2D>(__result, targetSlot);
             }
 
             [HarmonyPatch(typeof(UniversalImporter), "SpawnVolume", typeof(Slot), typeof(Uri), typeof(float3), typeof(bool))] //also: ImportLUT
@@ -90,7 +102,7 @@ namespace NeosAssetImportHook
             public static void PostfixVolume(Slot root, Uri tex3Durl, float3 scale, bool grayscale)
             {
                 var container = root.FindChild((child) => child.GetComponent<IAssetProvider<Texture3D>>() != null);
-                NotifyAllAssetProviders(container);
+                NotifyAllAssetProviders<Texture3D>(container);
             }
 
 
@@ -98,21 +110,21 @@ namespace NeosAssetImportHook
             [HarmonyPostfix]
             public static void PostfixCubemap(Slot slot, IAssetProvider<Cubemap> cubemap, bool grabbable = true)
             {
-                NotifyAllAssetProviders(slot);
+                NotifyAllAssetProviders<Cubemap>(slot);
             }
 
             [HarmonyPatch(typeof(ModelImporter), "ImportModelAsync")]
             [HarmonyPostfix]
             public static void PostfixModel(ref Task __result, string file, Slot targetSlot, ModelImportSettings settings, Slot assetsSlot = null, IProgressIndicator progressIndicator = null)
             {
-                __result = AwaitAndNotify(__result, targetSlot, assetsSlot, file);
+                __result = AwaitAndNotifyWithMeshAssets(__result, targetSlot, assetsSlot, file);
             }
 
             [HarmonyPatch(typeof(UniversalImporter), "SpawnFont")]
             [HarmonyPostfix]
             public static void PostfixFont(Slot root, IAssetProvider<Font> font)
             {
-                NotifyAllAssetProviders(root);
+                NotifyAllAssetProviders<Font>(root);
             }
 
             [HarmonyPatch(typeof(UniversalImporter), "DetectMultimedia")]
@@ -120,18 +132,40 @@ namespace NeosAssetImportHook
             public static void PostfixAudio(ref Task __result, AudioPlayerOrb playerOrb)
             {
                 //TODO: convert to Transpiler patch starting after AttachComponent<StaticAudioClip>()
-                __result = AwaitAndNotify(__result, playerOrb.Slot);
+                __result = AwaitAndNotify<AudioClip>(__result, playerOrb.Slot);
             }
 
             [HarmonyPatch(typeof(VideoImportDialog), "ImportAsync")]
             [HarmonyPostfix]
             public static void PostfixVideo(ref Task __result, Slot slot)
             {
-                __result = AwaitAndNotify(__result, slot);
+                __result = AwaitAndNotify<VideoTexture>(__result, slot);
             }
         }
 
-        private static async Task AwaitAndNotify(Task original, Slot slot, Slot assetsSlot, string file)
+        /// <summary>
+        /// Wrapper to handle importing by async functions:
+        /// awaits the original task and then notifies the handlers about the import.
+        /// </summary>
+        /// <typeparam name="A">Asset type being imported</typeparam>
+        /// <param name="original">Original import task</param>
+        /// <param name="slot">Main slot of the import</param>
+        /// <returns>A replacement task to be returned by the modded function</returns>
+        private static async Task AwaitAndNotify<A>(Task original, Slot slot) where A : class, IAsset
+        {
+            await original;
+            NotifyAllAssetProviders<A>(slot, null);
+        }
+
+        /// <summary>
+        /// Like <see cref="AwaitAndNotify{A}(Task, Slot)"/> but with extra code to accomodate the separate storage for mesh assets.
+        /// </summary>
+        /// <param name="original">Original import task</param>
+        /// <param name="slot">Main slot of the import</param>
+        /// <param name="assetsSlot">Where the mesh assets are stored, null causes a search by default name </param>
+        /// <param name="file">Used to determine default name of <paramref name="assetsSlot"/></param>
+        /// <returns></returns>
+        private static async Task AwaitAndNotifyWithMeshAssets(Task original, Slot slot, Slot assetsSlot, string file)
         {
             await original;
             if (assetsSlot == null)
@@ -146,16 +180,16 @@ namespace NeosAssetImportHook
                     }
                 });
             }
-            NotifyAllAssetProviders(slot, assetsSlot);
+            NotifyAllAssetProviders<Mesh>(slot, assetsSlot);
         }
 
-        private static async Task AwaitAndNotify(Task original, Slot slot)
-        {
-            await original;
-            NotifyAllAssetProviders(slot, null);
-        }
-
-        private static void NotifyAllAssetProviders(Slot root, Slot assetsSlot = null)
+        /// <summary>
+        /// Notifies all delegates registered at <see cref="AssetImportHooks.PostImport"/>
+        /// </summary>
+        /// <typeparam name="A">Asset type being imported</typeparam>
+        /// <param name="root">Main slot of the imported object</param>
+        /// <param name="assetsSlot">Hierarchy with additional assets</param>
+        private static void NotifyAllAssetProviders<A>(Slot root, Slot assetsSlot = null) where A : class, IAsset
         {
             var assetProviders = new List<IAssetProvider>();
 
@@ -171,11 +205,11 @@ namespace NeosAssetImportHook
 
             if (assetProviders.Any())
             {
-                AssetImportHooks.NotifyPostImport(root, assetProviders);
+                AssetImportHooks.NotifyPostImport<A>(root, assetProviders);
             }
             else
             {
-                UniLog.Error($"No assets found on {root}");
+                UniLog.Error($"No assets found on {root.Name} ({root.ReferenceID})!");
             }
         }
     }

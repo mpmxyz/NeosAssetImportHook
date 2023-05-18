@@ -10,4 +10,24 @@ A [NeosModLoader](https://github.com/zkxs/NeosModLoader) mod for [Neos VR](https
 
 ## Library Usage
 
-TODO: import as NuGet
+### Local Development
+Install the mod into Neos and reference it there.
+
+### Github workflow
+Make sure that you put [NeosAssetImportHook.dll](https://github.com/mpmxyz/NeosAssetImportHook/releases/latest/download/NeosAssetImportHook.dll) into the nml_mods directory before building your own mod.
+
+### API
+
+```C#
+AssetImportHooks.PostImport += (Slot slot, Type assetType, List<IAssetProvider> assets) =
+{
+	//will be executed on every import
+};
+AssetImportHooks.PostImport += AssetImportHooks.Typed<Mesh>(Slot slot, List<IAssetProvider> mainAssets, List<IAssetProvider> secondaryAssets) =
+{
+	//will only be executed for 3D model imports
+	//mainAssets contains all AssetProvider<Mesh> instances, secondaryAssets everything else
+};
+```
+
+See [AssetImportHooks.cs](https://github.com/mpmxyz/NeosAssetImportHook/blob/main/NeosAssetImportHook/AssetImportHooks.cs) more info.
