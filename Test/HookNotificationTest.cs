@@ -1,4 +1,5 @@
 using FrooxEngine;
+using System;
 using System.Collections.Generic;
 using System.Reflection;
 using Xunit;
@@ -11,8 +12,10 @@ namespace NeosAssetImportHook
         public void UntypedHooksAreNotified()
         {
             var called = false;
+            Console.WriteLine("Before adding delegate");
             AssetImportHooks.PostImport += (slot, type, assets) =>
             {
+                Console.WriteLine("Within delegate call");
                 var elems = new List<IAssetProvider>(assets);
                 Assert.Null(slot);
                 Assert.Equal(typeof(Mesh), type);
@@ -23,9 +26,11 @@ namespace NeosAssetImportHook
                 Assert.IsType<FakeTextureAsset>(elems[2]);
                 called = true;
             };
+            Console.WriteLine("Before getting generic method");
             var notify = typeof(AssetImportHooks)
                 .GetMethod("NotifyPostImport", BindingFlags.NonPublic | BindingFlags.Static)
                 .MakeGenericMethod(typeof(Mesh));
+            Console.WriteLine("Before invoking generic method");
 
             notify.Invoke(
                 null,
@@ -40,6 +45,7 @@ namespace NeosAssetImportHook
                     }
                 }
             );
+            Console.WriteLine("After invoking generic method");
 
             Assert.True(called);
         }

@@ -36,7 +36,6 @@ jobs:
 
       - name: Run tests
         run: |
-          dotnet build ./NeosAssetImportHook.sln --configuration Debug
           dotnet test ./NeosAssetImportHook.sln --configuration Debug
 
       - name: Calculate SHA256
