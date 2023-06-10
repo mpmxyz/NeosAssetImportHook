@@ -10,7 +10,7 @@ namespace NeosAssetImportHook
     /// <param name="slot">Main slot of the imported object. (special case Texture3D: the slot containing the volumetric texture)</param>
     /// <param name="mainAssetType">Type of the asset (a subtype of IAsset)</param>
     /// <param name="allAssets">All assets related to this import</param>
-    public delegate void UntypedPostImportHandler(Slot slot, Type mainAssetType, IEnumerable<IAssetProvider> allAssets);
+    public delegate void UntypedPostImportHandler(Slot slot, Type mainAssetType, IList<IAssetProvider> allAssets);
 
     /// <summary>
     /// Only triggered on imports of type <typeparamref name="A"/>
@@ -19,7 +19,7 @@ namespace NeosAssetImportHook
     /// <param name="slot">Main slot of the imported object. (special case Texture3D: the slot containing the volumetric texture)</param>
     /// <param name="mainAssets">All assets of type A</param>
     /// <param name="otherAssets">All other assets</param>
-    public delegate void TypedPostImportHandler<A>(Slot slot, IEnumerable<IAssetProvider<A>> mainAssets, IEnumerable<IAssetProvider> otherAssets) where A : class, IAsset;
+    public delegate void TypedPostImportHandler<A>(Slot slot, IList<IAssetProvider<A>> mainAssets, IList<IAssetProvider> otherAssets) where A : class, IAsset;
 
     public static class AssetImportHooks
     {
@@ -41,8 +41,8 @@ namespace NeosAssetImportHook
             {
                 if (typeof(A).Equals(mainAssetType))
                 {
-                    List<IAssetProvider<A>> mainAssets = new List<IAssetProvider<A>>();
-                    List<IAssetProvider> otherAssets = new List<IAssetProvider>();
+                    var mainAssets = new List<IAssetProvider<A>>();
+                    var otherAssets = new List<IAssetProvider>();
                     foreach (IAssetProvider asset in allAssets)
                     {
                         if (asset is IAssetProvider<A> a)
@@ -65,7 +65,7 @@ namespace NeosAssetImportHook
         /// <typeparam name="A">Asset type being imported</typeparam>
         /// <param name="slot">Main slot of the imported asset</param>
         /// <param name="assetProviders">All assets associated with the import (even secondary/tertiary)</param>
-        internal static void NotifyPostImport<A>(Slot slot, List<IAssetProvider> assetProviders) where A : class, IAsset
+        internal static void NotifyPostImport<A>(Slot slot, IList<IAssetProvider> assetProviders) where A : class, IAsset
         {
             PostImport?.Invoke(slot, typeof(A), assetProviders);
         }

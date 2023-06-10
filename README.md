@@ -4,7 +4,7 @@ A [NeosModLoader](https://github.com/zkxs/NeosModLoader) mod for [Neos VR](https
 
 ## Installation
 1. Install [NeosModLoader](https://github.com/zkxs/NeosModLoader).
-2. Download [NeosAssetImportHook.dll](https://github.com/mpmxyz/NeosAssetImportHook/releases/latest/download/NeosAssetImportHook.dll)
+2. Download [NeosAssetImportHook.dll](https://github.com/mpmxyz/NeosAssetImportHook/releases/latest/download/NeosAssetImportHook.dll).
 3. Copy it into the `nml_mods` directory inside your Neos install.
 4. Start the game. If you want to verify that the mod is working you can check your Neos logs.
 
@@ -19,11 +19,11 @@ Make sure that you put [NeosAssetImportHook.dll](https://github.com/mpmxyz/NeosA
 ### API
 
 ```C#
-AssetImportHooks.PostImport += (Slot slot, Type assetType, List<IAssetProvider> assets) =
+AssetImportHooks.PostImport += (Slot slot, Type mainAssetType, IList<IAssetProvider> allAssets) =>
 {
 	//will be executed on every import
 };
-AssetImportHooks.PostImport += AssetImportHooks.Typed<Mesh>(Slot slot, List<IAssetProvider> mainAssets, List<IAssetProvider> secondaryAssets) =
+AssetImportHooks.PostImport += AssetImportHooks.Typed<Mesh>(Slot slot, IList<IAssetProvider<A>> mainAssets, IList<IAssetProvider> otherAssets) =>
 {
 	//will only be executed for 3D model imports
 	//mainAssets contains all AssetProvider<Mesh> instances, secondaryAssets everything else
